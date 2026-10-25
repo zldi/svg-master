@@ -7,6 +7,9 @@ dist/
 data/
 
 # 临时工作目录与测试产物
+.tools/
+build-local.cmd
+*.lnk
 .tmp/
 .smoke/
 .playwright-cli/
