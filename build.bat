@@ -36,6 +36,7 @@ if errorlevel 1 goto :fail
 echo [4/5] Copying extra files ...
 if exist "README.md" copy /y "README.md" "%OUTDIR%\README.md" >nul 2>&1
 if exist "README-FIRST.txt" copy /y "README-FIRST.txt" "%OUTDIR%\README-FIRST.txt" >nul 2>&1
+if exist "CHANGELOG.md" copy /y "CHANGELOG.md" "%OUTDIR%\CHANGELOG.md" >nul 2>&1
 
 echo [5/5] Verifying ...
 if not exist "%OUTDIR%\%APPNAME%.exe" goto :fail

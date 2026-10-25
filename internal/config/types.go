@@ -7,7 +7,7 @@ import (
 )
 
 // AppVersion 是程序版本号，前端徽标与 /api/state 共用。
-const AppVersion = "1.4.1"
+const AppVersion = "1.1.1"
 
 // SettingsVersion 是 settings.json 的格式版本。
 // v4 引入生成方式三级开关（agent.genMode）。

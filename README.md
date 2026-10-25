@@ -1,6 +1,6 @@
 # SVG Master · SVG 生成器
 
-本仓库由 [zldi](https://github.com/zldi) 维护，基于 [tianjiangqiji/svg-master](https://github.com/tianjiangqiji/svg-master)（原作者 skyjee / tianjiangqiji），保留原项目提交历史与许可声明。首个增强版 **v1.1.0** 加入 Codex 订阅登录、额度显示及 Fast 设置，详见 [更新记录](CHANGELOG.md)。
+本仓库由 [zldi](https://github.com/zldi) 维护，基于 [tianjiangqiji/svg-master](https://github.com/tianjiangqiji/svg-master)（原作者 skyjee / tianjiangqiji），保留原项目提交历史与许可声明。当前版本 **v1.1.1** 修复 GIF 导出后画布空白、动画静止与透明背景残影；Codex 订阅登录、额度显示及 Fast 设置自 v1.1.0 提供，详见 [更新记录](CHANGELOG.md)。
 
 本地 SVG 生成工作台：Go 后端 + 原生 HTML 前端，Windows 主程序为单个 exe。支持四种 API 协议、ChatGPT 订阅接入、Agent 工具循环、图转 SVG、多图层编辑、动图预览与 GIF 导出。
 
@@ -198,8 +198,9 @@ SVG Master 为每个供应商维护独立的登录，不自动使用其他 Codex
 
 - 动图模式下的 SVG 照常渲染在画布上，**SMIL（`<animate>` / `<animateTransform>` / `<animateMotion>` / `<set>`）由浏览器原生播放**，不需要额外动画库。
 - 画布下方出现动图工具条：**播放 / 暂停**、**帧率**（1–30，仅对多帧分组动画生效）、帧位置显示、**导出 GIF**。
-- **导出 GIF 是纯前端实现**：把 SVG 序列化 → `Image` 载入 → 逐帧 `drawImage` 到 canvas → 自写 GIF89a 编码器（中位切分量化 + LZW + 帧差透明）打包成 Blob 下载。零第三方依赖、不经过后端、不需要联网。
-- 多帧分组动画（多个 `data-frame` 图层或 `<g id="frame-N">`）走「逐帧显隐 + 定时采样」；SMIL 动画走「按帧率在时间轴上采样」，两条路径共用同一个编码器。
+- **导出 GIF 是纯前端实现**：从当前 SVG 的固定快照逐帧序列化 → `Image` 载入 → `drawImage` 到 canvas → 自写 GIF89a 编码器（中位切分量化 + LZW + 透明背景逐帧清除）打包成 Blob 下载。导出保持画布原有播放 / 暂停状态，零第三方依赖、不经过后端、不需要联网。
+- 多帧分组动画（多个 `data-frame` 分组）按编号排序，预览和导出统一控制分组的 `display`、`opacity`、`visibility`，兼容同时带 SMIL 显隐动画的 SVG；纯 SMIL 动画走「按帧率平移时间采样」，两条路径共用同一个编码器。原始 SVG 源码保持不变。
+- **从旧版升级**：保存当前工程并关闭旧程序，替换程序文件后重新启动；保留 `data/` 与工程目录。已有 SVG 无需重新生成，已打开的旧窗口需要重启才会加载修复。
 
 ## 生成能力
 
@@ -263,10 +264,22 @@ svg-master/
 ```powershell
 go test ./...
 node --check internal/api/webdist/app.js
+node --check internal/api/webdist/gif.js
 git diff --check
 ```
 
-Node.js 仅用于 JavaScript 语法检查，不是主程序运行依赖。
+Node.js 用于 JavaScript 语法检查和浏览器回归测试，不是主程序运行依赖。
+
+GIF 浏览器回归测试使用已安装的 Playwright 和 Edge / Chromium，直接载入仓库前端，不启动后端或读取账号配置：
+
+```powershell
+# Playwright 需已安装并可被 Node.js 解析（也支持 .tools/ui-test/node_modules）。
+# 指定本机现有浏览器；省略时使用 Playwright 的 msedge 通道。
+$env:GIF_BROWSER_PATH = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+node test/pw/gif-export.cjs
+```
+
+还可将一份十二帧 SVG 文件路径作为首个参数，验证实际导出的十二帧均非空、与首帧不同以及导出后预览状态；设置 `GIF_OUTPUT_PATH` 可保存该样例的导出结果。仓库内置测试使用最小复现样例，不包含用户工程文件。
 
 | 验证项 | 覆盖内容 |
 |---|---|
@@ -274,6 +287,7 @@ Node.js 仅用于 JavaScript 语法检查，不是主程序运行依赖。
 | 账号与额度测试 | 供应商账号隔离、退出状态、Plus 5h、Pro / prolite / pro_* 7day、周期顺序变化、缺失及无效用量 |
 | Fast 测试 | 默认关闭、设置持久化、单次请求覆盖、参数透传、按返回值显示实际档位 |
 | 代理测试 | 环境代理优先、系统代理回退、仅有 NO_PROXY 时的处理、本机地址和绕过规则 |
+| GIF 浏览器回归 | 混合帧分组 / SMIL、显隐样式、帧顺序、透明背景清除、播放 / 暂停状态、导出失败恢复及静态单帧 |
 
 Windows 本地联调已验证一次 Codex 登录后获取模型、生成蓝色圆形、在后续请求中改成绿色，并查询同一账号的 7day 额度。浏览器联调覆盖登录与退出、额度面板、浅色 / 深色主题、Fast 状态及 API Key 模式；这些浏览器检查使用本地辅助脚本，未作为仓库内自动化测试发布。Plus 5h 的显示已通过模拟测试，尚未用真实 Plus 账号验证。
 
